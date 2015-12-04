@@ -1,8 +1,11 @@
-#include <string.h>
+
 
 #define SHIFT_AMOUNT 8
 //#define END_OF_CLUSTER 131072
 #define END_OF_CLUSTER 0x0FFFFFF8
+
+FILE* fp;
+unsigned int curr_dir;
 
 unsigned int bytes_per_sec; // offset = 11; size = 2
 unsigned int sec_per_clus;	// offset = 13; size = 1
@@ -13,11 +16,11 @@ unsigned int root_clus;		// offset = 44; size = 4
 unsigned int fds;			// First Data Sector
 
 void showbits(unsigned int x);
-unsigned int ExtractData(FILE* fp, unsigned int pos, unsigned int size);
+unsigned int ExtractData(unsigned int pos, unsigned int size);
 char* RemoveQuotes(char* str);
-void BootSectorInformation(FILE* fp);
+void BootSectorInformation();
 void PrintBPS();
-unsigned int PrintDirectory(FILE* fp, unsigned int clus_num);
+unsigned int PrintDirectory(unsigned int clus_num);
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -31,7 +34,7 @@ void showbits(unsigned int x) {
 	printf("\n");
 }
 
-unsigned int ExtractData(FILE* fp, unsigned int pos, unsigned int size){
+unsigned int ExtractData(unsigned int pos, unsigned int size){
 	unsigned int data = 0, temp;
 	int ch;
 	int i;
@@ -54,7 +57,7 @@ unsigned int ExtractData(FILE* fp, unsigned int pos, unsigned int size){
 char* RemoveQuotes(char* str){
 	char* ret;
 
-	ret = str[1];
+	ret = &str[1];
 	str[strlen(str)-1] = '\0';
 
 	return ret;
@@ -92,15 +95,15 @@ unsigned int ThisFATEntOffset(unsigned int clus_num){
 	return FATOff % bytes_per_sec;
 }
 
-void BootSectorInformation(FILE* fp){
+void BootSectorInformation(){
 	unsigned int rds;	// Root Directory Sectors
 
-	bytes_per_sec = ExtractData(fp, 11, 2);
-	sec_per_clus = ExtractData(fp, 13, 1);
-	rsvd_sec_cnt = ExtractData(fp, 14, 2);
-	num_fats = ExtractData(fp, 16, 1);
-	fats_z32 = ExtractData(fp, 36, 4);
-	root_clus = ExtractData(fp, 44, 4);
+	bytes_per_sec = ExtractData(11, 2);
+	sec_per_clus = ExtractData(13, 1);
+	rsvd_sec_cnt = ExtractData(14, 2);
+	num_fats = ExtractData(16, 1);
+	fats_z32 = ExtractData(36, 4);
+	root_clus = ExtractData(44, 4);
 
 	// This calculates root directory sectors and first data sector
 	rds = 0;	// 0 for FAT32
@@ -120,7 +123,7 @@ unsigned int GetSectorAddress(unsigned int sec_num){
 	return sec_num * (bytes_per_sec * sec_per_clus);
 }
 
-unsigned int GetAllClustersOfDirectory(unsigned int cluster_num, FILE* fp){
+unsigned int GetAllClustersOfDirectory(unsigned int cluster_num){
 	unsigned int next_clus;
 	unsigned int tfsn;
 	unsigned int tfeo;
@@ -135,44 +138,59 @@ unsigned int GetAllClustersOfDirectory(unsigned int cluster_num, FILE* fp){
 		tfeo = ThisFATEntOffset(root_clus);
 
 		// Extracts the data for the next cluster of this directory
-		next_clus = ExtractData(fp, GetSectorAddress(tfsn)+tfeo, 8);
+		next_clus = ExtractData(GetSectorAddress(tfsn)+tfeo, 8);
 	}
 }
 
-/*unsigned int PrintDirectory(FILE* fp, unsigned int clus_num){
-		unsigned int dir_fsc;
-		unsigned int dir_adr;
-		unsigned char dir_name[12];
-		unsigned char dir_attr;
-		unsigned int i, c = 0;
-		char ch;
+unsigned int PrintDirectory(unsigned int clus_num){
+	unsigned int dir_fsc;
+	unsigned int dir_adr;
+	unsigned char dir_name[12];
+	unsigned char dir_attr;
+	unsigned int i, j, c = 0;
+	char ch;
 
-		// Gets all the clusters of the root directory
-		GetAllClustersOfDirectory(clus_num, fp);
+	// Gets all the clusters of the root directory
+	GetAllClustersOfDirectory(clus_num);
 
-		// Locates the first sector of the root directory cluster;
-		dir_fsc = LocateFSC(clus_num);
-		dir_adr = GetSectorAddress(dir_fsc);
+	// Locates the first sector of the root directory cluster;
+	dir_fsc = LocateFSC(clus_num);
+	dir_adr = GetSectorAddress(dir_fsc);
 
-		for(j = 0; j < 12; j++){
-			ch = ExtractData(fp, dir_adr+(11-j), 1);
+	puts("================================");
+
+	for(i = 0; i < 512; i+=32){
+		dir_attr = ExtractData(dir_adr+i+11, 1);
+		if(dir_attr == 15)
+			continue;
+		for(j = 0; j < 11; j++){
+			ch = ExtractData(dir_adr+i+j, 1);
 			if(ch != 0)
 				dir_name[j] = ch;
 			else
 				dir_name[j] = ' ';
 		}
-		dir_name[12] = 0;
-		dir_attr = ExtractData(fp, dir_adr+11, 1);
+		dir_name[11] = 0;
+		if(dir_name[0] == ' ')
+			continue;
+			
+		printf("%s\n", dir_name);
+		// printf("ATTR:\t");
+		
+		// printf("NAME:\t%s\n", dir_name);
+		// printf("ATTR:\t");
+		
+		// showbits(dir_attr);
+	}
 
-		printf("DIR NAME:\t%s\n", dir_name);
-		printf("DIR ATTR:\t");
-		showbits(dir_attr);
-}*/
+	puts("================================");
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 //========== MAIN FUNCTIONS ===========//
 /* FOR ALL FUNCTIONS: Return 1 on success, 0 on error **/
 
+////////////// ALL JOHN
 unsigned int Open(char* file_name, char* mode){
 	char flags[3] = "rw";
 	int r = 0;
@@ -197,9 +215,14 @@ unsigned int Create(char* file_name){
 
 }
 
+//////////////
+
+// ABE
 unsigned int Remove(char* file_name){
 
 }
+
+////////////// ALL EVAN
 
 unsigned int PrintSize(char* file_name){
 
@@ -209,49 +232,12 @@ unsigned int ChangeDirectory(char* dir_name){
 
 }
 
-unsigned int List(FILE* fp, unsigned int clus_num){
-	unsigned int dir_fsc;
-	unsigned int dir_adr;
-	unsigned char dir_name[12];
-	unsigned char dir_attr;
-	unsigned int i, j, c = 0;
-	char ch;
-
-	// Gets all the clusters of the root directory
-	GetAllClustersOfDirectory(clus_num, fp);
-
-	// Locates the first sector of the root directory cluster;
-	dir_fsc = LocateFSC(clus_num);
-	dir_adr = GetSectorAddress(dir_fsc);
-
-	puts("================================");
-
-	for(i = 0; i < 512; i+=32){
-		dir_attr = ExtractData(fp, dir_adr+i+11, 1);
-		if(dir_attr == 15)
-			continue;
-		for(j = 0; j < 11; j++){
-			ch = ExtractData(fp, dir_adr+i+j, 1);
-			if(ch != 0)
-				dir_name[j] = ch;
-			else
-				dir_name[j] = ' ';
-		}
-		dir_name[11] = 0;
-		if(dir_name[0] == ' ')
-			continue;
-			
-		printf("%s\n", dir_name);
-		// printf("ATTR:\t");
-		
-		// printf("NAME:\t%s\n", dir_name);
-		// printf("ATTR:\t");
-		
-		// showbits(dir_attr);
-	}
-
-	puts("================================");
+unsigned int List(char* dir_name){
+	// Parse name
+	// Name to cluster
+	PrintDirectory(root_clus);
 }
+
 
 unsigned int MakeDir(char* dir_name){
 
@@ -261,11 +247,14 @@ unsigned int RemoveDir(char* dir_name){
 
 }
 
+//////////////
+
+// ABE
 unsigned int ReadFile(char* file_name, unsigned int pos, unsigned int size){
 
 }
 
+// ABE
 unsigned int WriteToFile(char* file_name, unsigned int pos, unsigned int size,
 	char* msg){
-
 }
