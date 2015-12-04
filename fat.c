@@ -6,23 +6,21 @@
 extern FILE* fp;
 extern unsigned int curr_dir;
 
+typedef enum { false, true } bool;
+
 /**
 GETCMD()
 Main function for printing shell prompt and getting
 user inputs.
 **/
 static char* getCmd() {
-	static char cmdLine[1024];
+	static char cmdLine[128];
 
 	printf("%s => ", "FAT");
 
 	// gets input from user and stores in cmdLine or returns NULL
-	if (fgets(cmdLine, sizeof(cmdLine), stdin) == NULL)
+	if (scanf("%s", cmdLine) == NULL)
 		return NULL;
-
-	// checks and adds Null character if needed
-	if (cmdLine[strlen(cmdLine) - 1] == '\n')
-		cmdLine[strlen(cmdLine) - 1] = 0;
 
 	return cmdLine; // returns cmdLine string
 }
@@ -30,32 +28,39 @@ static char* getCmd() {
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(){
-	char* message, cmdline, cmd, temp;
+	char* cmd, temp;
 	size_t result;
-	int i;
+	bool exitBool = false;
 
-	message = (char*) malloc(513);
 	fp = fopen("fat32.img", "rb");
+	cmd = (char*) malloc (128);
 
 	BootSectorInformation();
 	PrintBPS();
 	printf("First Data Sector:\t%i\n", fds);
 	printf("Root Directory:\t\t%i\n", LocateFSC(root_clus));
+	
+	// cmd = getCmd();
 
-	// while((cmdline = getCmd()) != NULL){
-	// 	if(strcmp(cmd, "open")){
-	// 		// OPEN
-	// 	}
-	// 	else if(strcmp(cmd, "ls")){
-	// 		PrintDirectory(root_clus);
-	// 	}
-	// 	else if(strcmp(cmd, "exit")){
-	// 		break;
-	// 	}
-	// 	else{
-	// 		fprintf(stderr, "ERROR: '%s' is not a supported command.\n", cmd);
-	// 	}
-	// }
+	while(cmd = getCmd()) {
+		if(strcmp(cmd, "open") == 0) {
+			
+			printf("Open\n");
+		
+		} else if(strcmp(cmd, "ls") == 0) {
+		
+			PrintDirectory(root_clus);
+		
+		} else if(strcmp(cmd, "exit") == 0) {
+		
+			break; // breaks out of loop
+		
+		} else {
+		
+			fprintf(stderr, "ERROR: '%s' is not a supported command.\n", cmd);
+		}
+
+	}
 
 	PrintDirectory(root_clus);
 
