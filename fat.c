@@ -137,6 +137,10 @@ unsigned int PrintDirectory(FILE* fp, unsigned int clus_num){
 	dir_fsc = LocateFSC(clus_num);
 	dir_adr = GetSectorAddress(dir_fsc);
 
+	/* DOES NOT WORK YET */
+	/* NEED TO STUDY PRINTING NAME */
+	/* CHECK EXTRACT DATA IF EXTRACTING CORRECT DATA */
+	/* POSSIBLY MAKE PRINT BIT BY BIT */
 	dir_name = ExtractData(fp, dir_adr, 11);
 	dir_attr = ExtractData(fp, dir_adr+11, 1);
 
