@@ -73,8 +73,20 @@ int main(){
 			}
 			List(&cmd[3]);
 		} 
-		else if(strncmp(cmd, "mkdir", 5) == 0) {}
-		else if(strncmp(cmd, "rmdir", 5) == 0) {}
+		else if(strncmp(cmd, "mkdir", 5) == 0) {
+			if(strlen(cmd) < 6){
+				fprintf(stderr, "USAGE: mkdir <directory_name>\n");
+				continue;
+			}
+			MakeDir(&cmd[6]);
+		}
+		else if(strncmp(cmd, "rmdir", 5) == 0) {
+			if(strlen(cmd) < 6){
+				fprintf(stderr, "USAGE: rmdir <directory_name>\n");
+				continue;
+			}
+			RemoveDir(&cmd[6]);
+		}
 		else if(strncmp(cmd, "read", 4) == 0) {}
 		else if(strncmp(cmd, "write", 5) == 0) {}
 		else if(strncmp(cmd, "exit", 4) == 0) {

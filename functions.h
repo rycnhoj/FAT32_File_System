@@ -330,7 +330,6 @@ unsigned int PrintSize(char* file_name){
 
 unsigned int ChangeDirectory(char* dir_name){
 	File* next_dir;
-
 	if(curr_dir == 0){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
@@ -352,13 +351,11 @@ unsigned int ChangeDirectory(char* dir_name){
 }
 
 unsigned int List(char* dir_name){
-	unsigned int cluster;
 	int i;
 	Directory dir;
 	File* next_dir;
 
 	if(curr_dir == 0){
-		cluster = root_clus;
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
@@ -384,11 +381,41 @@ unsigned int List(char* dir_name){
 }
 
 unsigned int MakeDir(char* dir_name){
+	File* new_dir;
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+	}
+	new_dir = SearchForFileInCurrentDirectory(dir_name);
+	if(new_dir != NULL)	{
+		fprintf(stderr,
+			"ERROR: '%s' already exists in the current directory.\n", dir_name);
+		return 0;
+	}
 
+	// ADD DIRECTORY ENTRY IN HERE
 }
 
 unsigned int RemoveDir(char* dir_name){
+	File* new_dir;
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+	}
+	new_dir = SearchForFileInCurrentDirectory(dir_name);
+	if(new_dir == NULL)	{
+		fprintf(stderr,
+			"ERROR: '%s' does not exist in the current directory.\n", dir_name);
+		return 0;
+	}
+	else if(!CheckBitSet(new_dir->file_attr, 4)){
+		fprintf(stderr, "ERROR: '%s' is not a directory.\n", dir_name);
+		return 0;
+	}
+	// UP TO HERE, CHECKS FOR EXISTENCE AND IF IS DIRECTORY
+	// NEED TO CHECK IF DIRECTORY IS EMPTY
 
+	// REMOVE DIRECTORY HERE
 }
 
 //////////////
