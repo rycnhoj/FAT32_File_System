@@ -33,6 +33,10 @@ int main(){
 	bool exitBool = false;
 
 	fp = fopen("fat32.img", "rb");
+	if(!fp){
+		fputs("ERROR: File not found.\n", stderr);
+		exit(1);
+	}
 	cmd = (char*) malloc (128);
 
 	BootSectorInformation();
