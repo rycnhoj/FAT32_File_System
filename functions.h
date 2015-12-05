@@ -1,5 +1,13 @@
 #define SHIFT_AMOUNT 8
 #define END_OF_CLUSTER 0x0FFFFFF8
+#define DIR_NAME_BYTES 11
+#define DIR_ATTR_OFFSET 11
+#define DIR_ATTR_BYTES 1
+#define DIR_CLUS_HI_OFFSET 20
+#define DIR_CLUS_LOW_OFFSET 26
+#define DIR_CLUS_BYTES 2
+#define FILE_SIZE_OFFSET 28
+#define FILE_SIZE_BYTES 4
 
 FILE* fp;
 unsigned int curr_dir;
@@ -12,7 +20,7 @@ unsigned int fats_z32;		// offset = 36; size = 4
 unsigned int root_clus;		// offset = 44; size = 4
 unsigned int fds;			// First Data Sector
 
-void showbits(unsigned int x);
+void ShowBits(unsigned int x);
 unsigned int ExtractData(unsigned int pos, unsigned int size);
 char* RemoveQuotes(char* str);
 void BootSectorInformation();
@@ -23,7 +31,11 @@ unsigned int PrintDirectory(unsigned int clus_num);
 ///////////////////////////////////////////////////////////////////////////////
 //======== HELPER FUNCTIONS ===========//
 
-void showbits(unsigned int x) {
+int CheckBitSet(unsigned char c, int n) {
+    return ((1 << n) & c);
+}
+
+void ShowBits(unsigned int x) {
     int i; 
     for(i=(sizeof(int)*8)-1; i>=0; i--)
         (x&(1<<i))?putchar('1'):putchar('0');
@@ -144,7 +156,7 @@ unsigned int PrintDirectory(unsigned int clus_num){
 	unsigned int dir_adr;
 	unsigned char dir_name[12];
 	unsigned char dir_attr;
-	unsigned int i, j, c = 0;
+	unsigned int i, j, c = 0, dir_size;
 	char ch;
 
 	// Gets all the clusters of the root directory
@@ -156,28 +168,32 @@ unsigned int PrintDirectory(unsigned int clus_num){
 
 	puts("================================");
 
-	for(i = 0; i < 512; i+=32){
-		dir_attr = ExtractData(dir_adr+i+11, 1);
+	for(i = 0; i < (bytes_per_sec*sec_per_clus); i+=32){
+		// Extract Attributes
+		dir_attr = ExtractData(dir_adr+i+DIR_ATTR_OFFSET, DIR_ATTR_BYTES);
+		// Continues on long-name entries.
 		if(dir_attr == 15)
 			continue;
-		for(j = 0; j < 11; j++){
+
+		// Extracts File name - max 11 chars
+		for(j = 0; j < DIR_NAME_BYTES; j++){
 			ch = ExtractData(dir_adr+i+j, 1);
 			if(ch != 0)
 				dir_name[j] = ch;
 			else
 				dir_name[j] = ' ';
 		}
-		dir_name[11] = 0;
+		dir_name[DIR_NAME_BYTES] = 0;
 		if(dir_name[0] == ' ')
 			continue;
-			
+
+		if(!CheckBitSet(dir_attr, 4))
+			printf("%s: ", "F");
+		else
+			printf("%s: ", "D");
 		printf("%s\n", dir_name);
-		// printf("ATTR:\t");
-		
-		// printf("NAME:\t%s\n", dir_name);
-		// printf("ATTR:\t");
-		
-		// showbits(dir_attr);
+
+		dir_size = ExtractData(dir_adr+i+FILE_SIZE_OFFSET, FILE_SIZE_BYTES);
 	}
 
 	puts("================================");
@@ -230,11 +246,12 @@ unsigned int ChangeDirectory(char* dir_name){
 }
 
 unsigned int List(char* dir_name){
+	unsigned int cluster;
 	// Parse name
 	// Name to cluster
-	PrintDirectory(root_clus);
+	cluster = root_clus;
+	PrintDirectory(cluster);
 }
-
 
 unsigned int MakeDir(char* dir_name){
 
