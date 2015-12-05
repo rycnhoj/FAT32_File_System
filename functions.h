@@ -1,7 +1,4 @@
-
-
 #define SHIFT_AMOUNT 8
-//#define END_OF_CLUSTER 131072
 #define END_OF_CLUSTER 0x0FFFFFF8
 
 FILE* fp;
