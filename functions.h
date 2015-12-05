@@ -8,9 +8,9 @@
 #define DIR_CLUS_BYTES 2
 #define FILE_SIZE_OFFSET 28
 #define FILE_SIZE_BYTES 4
+#define EMPTY_FILE_NAME 0000000000
+#define MAX_OPEN_FILES 64
 
-FILE* fp;
-unsigned int curr_dir = 0;
 
 unsigned int bytes_per_sec; // offset = 11; size = 2
 unsigned int sec_per_clus;	// offset = 13; size = 1
@@ -32,14 +32,19 @@ typedef struct File{
 	unsigned int file_size;
 	unsigned int file_attr;
 	unsigned int first_clus_num;
+	unsigned int mode;
 } File;
 
 typedef struct Directory{
-	File files[32];
+	File files[MAX_OPEN_FILES];
 	unsigned int num_files;
 } Directory;
 
+FILE* fp;
+unsigned int curr_dir = 0;
 Directory current_directory;
+Directory open_files;
+unsigned int max_open_files;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -95,7 +100,17 @@ char* RemoveQuotes(char* str){
 	return ret;
 }
 
+char * RemovePeriods(char * str) {
+    int i = 0;
 
+    while (str[i] != '\0'){
+        if (str[i] == '.')
+            str[i] = ' ';
+        i++;
+    }
+
+    return str;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 //======= FILE SYSTEM FUNCTIONS =======//
@@ -205,6 +220,37 @@ void PrintDirectoryContents(Directory dir){
 	puts("================================");	
 }
 
+void PrintOpenFiles(Directory dir){
+	int i;
+
+	if(dir.num_files == 0){
+		printf("There are no open files.\n");
+		return;
+	}
+	puts("================================");	
+	for(i = 0; i < max_open_files; i++){
+		File* temp = &dir.files[i];
+		if(temp->file_name[0] == '\0'){
+			continue;
+		}
+		if(!CheckBitSet(temp->file_attr, 4))
+			printf("%s: ", "F");
+		else
+			printf("%s: ", "D");
+		printf("%s - ", temp->file_name);
+		printf("%i bytes", temp->file_size);
+		char* md;
+		switch(temp->mode){
+		case 1: md = "r"; break;
+		case 2: md = "w"; break;
+		case 3: md = "rw"; break;
+		default: md = "error"; break;
+		}
+		printf(", in mode '%s'\n", md);
+	}
+	puts("================================");	
+}
+
 Directory GetDirectoryContents(unsigned int clus_num){
 	Directory dir_contents;
 	unsigned int dir_fsc;
@@ -262,6 +308,34 @@ Directory GetDirectoryContents(unsigned int clus_num){
 	return dir_contents;
 }
 
+File* SearchForFirstEmptyFileInDirectory(Directory dir){
+	File* temp;
+	int i;
+
+	if(open_files.num_files == 0){
+		return &open_files.files[0];
+	}
+	for(i = 0; i < 128; i++){
+		temp = &dir.files[i];
+		if(temp->file_name == NULL){
+			return temp;
+		}
+	}
+	return NULL;
+}
+
+File* SearchForFileInDirectory(char* file_name, Directory dir){
+	File* temp;
+	int i;
+	for(i = 0; i < dir.num_files; i++){
+		temp = &dir.files[i];
+		if(strncmp(file_name, temp->file_name, strlen(file_name)) == 0){
+			return temp;
+		}
+	}
+	return NULL;
+}
+
 File* SearchForFileInCurrentDirectory(char* file_name){
 	File* temp;
 	int i;
@@ -274,29 +348,99 @@ File* SearchForFileInCurrentDirectory(char* file_name){
 	return NULL;
 }
 
+void EmptyOpenFiles(){
+	int i;
+	int j;
+	File* temp;
+	for(i = 0; i < 128; i++){
+		temp = &open_files.files[i];
+		temp->file_name[0] = '\0';
+		temp->file_attr = 0;
+		temp->file_size = 0;
+		temp->first_clus_num = 0;
+		temp->mode = -1; 
+	}
+	open_files.num_files = 0;
+	max_open_files = 0;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //========== MAIN FUNCTIONS ===========//
 /* FOR ALL FUNCTIONS: Return 1 on success, 0 on error **/
 
 ////////////// ALL JOHN
 unsigned int Open(char* file_name, char* mode){
-	char flags[3] = "rw";
-	int r = 0;
-	int w = 0;
+	File *temp, *empty;
+	int modeInt; 
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+		EmptyOpenFiles();
+	}
 
-	if(strpbrk(mode, flags) == NULL){
-		fprintf(stderr, "ERROR: %s - invalid mode.\n", mode);
+	if (strcmp(mode, "r") == 0) { modeInt = 1; }
+	else if (strcmp(mode, "w") == 0) { modeInt = 2;}
+	else if (strcmp(mode, "rw") == 0 || strcmp(mode, "wr") == 0) {
+		modeInt = 3;
+	}
+
+	temp = SearchForFileInDirectory(file_name, open_files);
+	if(temp != NULL){
+		char* md;
+		switch(temp->mode){
+		case 1: md = "r"; break;
+		case 2: md = "w"; break;
+		case 3: md = "rw"; break;
+		default: md = "error"; break;
+		}
+		fprintf(stderr, 
+			"ERROR: '%s' is already opened, with mode '%s'.\n", file_name, md);
+		return 0;		
+	}
+
+	temp = SearchForFileInCurrentDirectory(file_name);
+	if(temp == NULL){
+		fprintf(stderr, 
+			"ERROR: '%s' does not exist in the current directory.\n", file_name);
 		return 0;
 	}
-	if(strchr(mode, 'r') != NULL)
-		r = 1;
-	if(strchr(mode, 'w') != NULL)
-		w = 1;
 
+	if(open_files.num_files == MAX_OPEN_FILES){
+		fprintf(stderr, 
+			"ERROR: You have reached the maximum number of open files.\n", file_name);
+		return 0;
+	}
+	empty = &open_files.files[max_open_files];
+	strcpy(empty->file_name, temp->file_name);
+	empty->file_attr = temp->file_attr;
+	empty->first_clus_num = temp->first_clus_num;
+	empty->mode = modeInt;
+	open_files.num_files++; // increments the number of files open 
+	max_open_files++;
+
+	printf("'%s' has been successfully opened.\n", file_name);
+	PrintOpenFiles(open_files);
 }
 
 unsigned int Close(char* file_name){
+	File* temp;
+	if(open_files.num_files == 0){
+		fprintf(stderr, "ERROR: '%s' is not an open file.\n", file_name);
+		return 0;
+	}
+	temp = SearchForFileInDirectory(file_name, open_files);
+	if(temp == NULL){
+		fprintf(stderr, "ERROR: '%s' is not an open file.\n", file_name);
+		return 0;
+	}
+	temp->file_name[0] = '\0';
+	temp->file_size = 0;
+	temp->file_attr = 0;
+	temp->mode = -1;
+	open_files.num_files--;
 
+	printf("'%s' has been successfully closed.\n", file_name);
+	PrintOpenFiles(open_files);
 }
 
 unsigned int Create(char* file_name){
