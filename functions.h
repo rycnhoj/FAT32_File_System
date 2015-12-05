@@ -317,7 +317,26 @@ unsigned int PrintSize(char* file_name){
 }
 
 unsigned int ChangeDirectory(char* dir_name){
+	File* next_dir;
+
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+	}
+	next_dir = SearchForFileInCurrentDirectory(dir_name);
+	if(next_dir == NULL){
+		fprintf(stderr,
+			"ERROR: '%s' could not be found in the current directory.\n", dir_name);
+		return 0;
+	}
+	else if(!CheckBitSet(next_dir->file_attr, 4)){
+		fprintf(stderr, "ERROR: '%s' is not a directory.\n", dir_name);
+		return 0;
+	}
+
+	curr_dir = next_dir->first_clus_num;
 	ClearCurrentDirectory();
+	current_directory = GetDirectoryContents(curr_dir);
 }
 
 unsigned int List(char* dir_name){
@@ -331,7 +350,6 @@ unsigned int List(char* dir_name){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
-
 	if(current_directory.num_files == 0){
 		fprintf(stderr, "There are no files in the current directory.\n");
 		return 0;
@@ -346,7 +364,7 @@ unsigned int List(char* dir_name){
 			"ERROR: '%s' could not be found in the current directory.\n", dir_name);
 		return 0;
 	}
-	if(!CheckBitSet(next_dir->file_attr, 4)){
+	else if(!CheckBitSet(next_dir->file_attr, 4)){
 		fprintf(stderr, "ERROR: '%s' is not a directory.\n", dir_name);
 		return 0;
 	}

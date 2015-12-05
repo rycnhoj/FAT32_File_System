@@ -48,17 +48,33 @@ int main(){
 		cmd[strlen(cmd)-1] = '\0';
 		if(strncmp(cmd, "open", 4) == 0) {
 			printf("Open\n");
-		} else if(strncmp(cmd, "ls", 2) == 0) {
+		} 
+		else if(strncmp(cmd, "close", 5) == 0) {}
+		else if(strncmp(cmd, "create", 6) == 0) {}
+		else if(strncmp(cmd, "rm", 2) == 0) {}
+		else if(strncmp(cmd, "size", 4) == 0) {}
+		else if(strncmp(cmd, "cd", 2) == 0) {
+			if(strlen(cmd) < 3){
+				fprintf(stderr, "USAGE: cd <directory_name>.\n");
+				continue;
+			}
+			ChangeDirectory(&cmd[3]);
+		}
+		else if(strncmp(cmd, "ls", 2) == 0) {
 			if(strlen(cmd) < 3){
 				fprintf(stderr, "USAGE: ls <directory_name>.\n");
 				continue;
 			}
 			List(&cmd[3]);
-		} else if(strncmp(cmd, "exit", 4) == 0) {
-		
+		} 
+		else if(strncmp(cmd, "mkdir", 5) == 0) {}
+		else if(strncmp(cmd, "rmdir", 5) == 0) {}
+		else if(strncmp(cmd, "read", 4) == 0) {}
+		else if(strncmp(cmd, "write", 5) == 0) {}
+		else if(strncmp(cmd, "exit", 4) == 0) {
 			break; // breaks out of loop
-		
-		} else {
+		} 
+		else {
 		
 			fprintf(stderr, "ERROR: '%s' is not a supported command.\n", cmd);
 		}
