@@ -39,6 +39,9 @@ typedef struct Directory{
 	unsigned int num_files;
 } Directory;
 
+Directory current_directory;
+
+
 ///////////////////////////////////////////////////////////////////////////////
 //======== HELPER FUNCTIONS ===========//
 
@@ -171,6 +174,16 @@ unsigned int GetAllClustersOfDirectory(unsigned int cluster_num){
 	}
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+void ClearCurrentDirectory(){
+	// int i;
+	// for(i = 0; i < current_directory.num_files; i++){
+	// 	current_directory.files[i] = 0;
+	// }
+	current_directory.num_files = 0;
+}
+
 void PrintDirectoryContents(Directory dir){
 	int i;
 
@@ -186,7 +199,8 @@ void PrintDirectoryContents(Directory dir){
 		else
 			printf("%s: ", "D");
 		printf("%s - ", temp->file_name);
-		printf("%i bytes\n", temp->file_size);
+		printf("%i bytes ", temp->file_size);
+		printf("(Cluster #: %i)\n", temp->first_clus_num);
 	}
 	puts("================================");	
 }
@@ -195,8 +209,9 @@ Directory GetDirectoryContents(unsigned int clus_num){
 	Directory dir_contents;
 	unsigned int dir_fsc;
 	unsigned int dir_adr;
-	unsigned char dir_clus_hi_word;
-	unsigned char dir_clus_lo_word;
+	unsigned int dir_clus_hi_word;
+	unsigned int dir_clus_lo_word;
+	unsigned int dir_clus;
 	unsigned char dir_name[12];
 	unsigned char dir_attr;
 	unsigned int i, j, c = 0, dir_size;
@@ -231,18 +246,32 @@ Directory GetDirectoryContents(unsigned int clus_num){
 		dir_clus_hi_word = ExtractData(dir_adr+i+DIR_CLUS_HI_OFFSET, DIR_CLUS_BYTES);
 		dir_clus_lo_word = ExtractData(dir_adr+i+DIR_CLUS_LO_OFFSET, DIR_CLUS_BYTES);
 
-		puts("HI:");
-		ShowCharBits(dir_clus_hi_word);
-		puts("LO:");
-		ShowCharBits(dir_clus_lo_word);
+		dir_clus_hi_word << 16;
+		dir_clus = dir_clus_hi_word | dir_clus_lo_word;
+
+		//printf("CLUS: %i", dir_clus);
+		//ShowBits(dir_clus);
 
 		strcpy(temp_file.file_name, dir_name);
 		temp_file.file_size = dir_size;
 		temp_file.file_attr = dir_attr;
+		temp_file.first_clus_num = dir_clus;
 		dir_contents.files[c++] = temp_file;
 	}
 	dir_contents.num_files = c;
 	return dir_contents;
+}
+
+File* SearchForFileInCurrentDirectory(char* file_name){
+	File* temp;
+	int i;
+	for(i = 0; i < current_directory.num_files; i++){
+		temp = &current_directory.files[i];
+		if(strncmp(file_name, temp->file_name, strlen(file_name)) == 0){
+			return temp;
+		}
+	}
+	return NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -288,22 +317,40 @@ unsigned int PrintSize(char* file_name){
 }
 
 unsigned int ChangeDirectory(char* dir_name){
-
+	ClearCurrentDirectory();
 }
 
 unsigned int List(char* dir_name){
 	unsigned int cluster;
+	int i;
 	Directory dir;
+	File* next_dir;
+
 	if(curr_dir == 0){
 		cluster = root_clus;
 		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
 	}
-	//dir = GetDirectoryContents(cluster);
 
-	// Search for name
-	// Get new directory contents and print
-
-	PrintDirectoryContents(GetDirectoryContents(cluster));
+	if(current_directory.num_files == 0){
+		fprintf(stderr, "There are no files in the current directory.\n");
+		return 0;
+	}
+	if(curr_dir = root_clus && strcmp(dir_name, ".") == 0){
+		PrintDirectoryContents(current_directory);
+		return 1;
+	}
+	next_dir = SearchForFileInCurrentDirectory(dir_name);
+	if(next_dir == NULL){
+		fprintf(stderr,
+			"ERROR: '%s' could not be found in the current directory.\n", dir_name);
+		return 0;
+	}
+	if(!CheckBitSet(next_dir->file_attr, 4)){
+		fprintf(stderr, "ERROR: '%s' is not a directory.\n", dir_name);
+		return 0;
+	}
+	PrintDirectoryContents(GetDirectoryContents(next_dir->first_clus_num));
 }
 
 unsigned int MakeDir(char* dir_name){

@@ -19,7 +19,7 @@ static char* getCmd() {
 	printf("%s => ", "FAT");
 
 	// gets input from user and stores in cmdLine or returns NULL
-	if (scanf("%s", cmdLine) == NULL)
+	if (fgets(cmdLine, 128, stdin) == NULL)
 		return NULL;
 
 	return cmdLine; // returns cmdLine string
@@ -43,15 +43,18 @@ int main(){
 	PrintBPS();
 	printf("First Data Sector:\t%i\n", fds);
 	printf("Root Directory:\t\t%i\n", LocateFSC(root_clus));
-	
-	// cmd = getCmd();
 
-	while(cmd = getCmd()) {
-		if(strcmp(cmd, "open") == 0) {
+	while((cmd = getCmd()) != NULL) {
+		cmd[strlen(cmd)-1] = '\0';
+		if(strncmp(cmd, "open", 4) == 0) {
 			printf("Open\n");
-		} else if(strcmp(cmd, "ls") == 0) {
-			List("root");
-		} else if(strcmp(cmd, "exit") == 0) {
+		} else if(strncmp(cmd, "ls", 2) == 0) {
+			if(strlen(cmd) < 3){
+				fprintf(stderr, "USAGE: ls <directory_name>.\n");
+				continue;
+			}
+			List(&cmd[3]);
+		} else if(strncmp(cmd, "exit", 4) == 0) {
 		
 			break; // breaks out of loop
 		
@@ -59,10 +62,8 @@ int main(){
 		
 			fprintf(stderr, "ERROR: '%s' is not a supported command.\n", cmd);
 		}
-
 	}
 
 	fclose(fp);
-
 	return 0;
 }
