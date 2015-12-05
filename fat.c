@@ -32,7 +32,7 @@ int main(){
 	size_t result;
 	bool exitBool = false;
 
-	fp = fopen("fat32.img", "rb");
+	fp = fopen("fat32.img", "r+b");
 	if(!fp){
 		fputs("ERROR: File not found.\n", stderr);
 		exit(1);
@@ -65,12 +65,11 @@ int main(){
 				fprintf(stderr, "\trw/wr - Read & Write.\n");
 				continue;
 			}
-
 			Open(fileName, mode);
 		} 
 		else if(strncmp(cmd, "close", 5) == 0) {
 			if(strlen(cmd) < 5){
-				fprintf(stderr, "USAGE: open <FILE_NAME> <MODE>\n");
+				fprintf(stderr, "USAGE: close <FILE_NAME>\n");
 				continue;
 			}
 			char fileName[12];
@@ -114,8 +113,26 @@ int main(){
 			}
 			RemoveDir(&cmd[6]);
 		}
-		else if(strncmp(cmd, "read", 4) == 0) {}
-		else if(strncmp(cmd, "write", 5) == 0) {}
+		else if(strncmp(cmd, "read", 4) == 0) {
+			if(strlen(cmd) < 5){
+				fprintf(stderr, "USAGE: read <FILE_NAME> <POS> <NUM_BYTES>\n");
+				continue;
+			}
+			char fileName[12];
+			int pos, size;
+			sscanf(cmd, "%*s %s %i %i", fileName, &pos, &size);
+			ReadFile(fileName, pos, size);
+		}
+		else if(strncmp(cmd, "write", 5) == 0) {
+			if(strlen(cmd) < 5){
+				fprintf(stderr, "USAGE: write <FILE_NAME> <POS> <NUM_BYTES> <STRING>\n");
+				continue;
+			}
+			char fileName[12], msg[1024];
+			int pos, size;
+			sscanf(cmd, "%*s %s %i %i %s", fileName, &pos, &size, msg);
+			WriteToFile(fileName, pos, size, msg);
+		}
 		else if(strncmp(cmd, "exit", 4) == 0) {
 			break; // breaks out of loop
 		} 

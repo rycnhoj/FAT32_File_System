@@ -11,6 +11,7 @@
 #define EMPTY_FILE_NAME 0000000000
 #define MAX_OPEN_FILES 64
 
+#include <ctype.h>
 
 unsigned int bytes_per_sec; // offset = 11; size = 2
 unsigned int sec_per_clus;	// offset = 13; size = 1
@@ -70,6 +71,15 @@ void ShowCharBits(unsigned char x) {
 	printf("\n");
 }
 
+char* StrUpr(char *str) {
+  size_t i;
+  size_t len = strlen(str);
+
+  for(i=0; i<len; i++)
+  	str[i]=toupper((unsigned char)str[i]);
+
+  return str;
+}
 
 unsigned int ExtractData(unsigned int pos, unsigned int size){
 	unsigned int data = 0, temp;
@@ -324,16 +334,16 @@ File* SearchForFirstEmptyFileInDirectory(Directory dir){
 	return NULL;
 }
 
-File* SearchForFileInDirectory(char* file_name, Directory dir){
+int SearchForFileInOpenFiles(char* file_name, Directory dir){
 	File* temp;
 	int i;
-	for(i = 0; i < dir.num_files; i++){
+	for(i = 0; i < max_open_files; i++){
 		temp = &dir.files[i];
 		if(strncmp(file_name, temp->file_name, strlen(file_name)) == 0){
-			return temp;
+			return i;
 		}
 	}
-	return NULL;
+	return -1;
 }
 
 File* SearchForFileInCurrentDirectory(char* file_name){
@@ -348,46 +358,30 @@ File* SearchForFileInCurrentDirectory(char* file_name){
 	return NULL;
 }
 
-void EmptyOpenFiles(){
-	int i;
-	int j;
-	File* temp;
-	for(i = 0; i < 128; i++){
-		temp = &open_files.files[i];
-		temp->file_name[0] = '\0';
-		temp->file_attr = 0;
-		temp->file_size = 0;
-		temp->first_clus_num = 0;
-		temp->mode = -1; 
-	}
-	open_files.num_files = 0;
-	max_open_files = 0;
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 //========== MAIN FUNCTIONS ===========//
 /* FOR ALL FUNCTIONS: Return 1 on success, 0 on error **/
 
 ////////////// ALL JOHN
 unsigned int Open(char* file_name, char* mode){
-	File *temp, *empty;
-	int modeInt; 
+	File *f, *empty;
+	int temp;
+	unsigned int modeInt; 
 	if(curr_dir == 0){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
-		EmptyOpenFiles();
 	}
-
+	file_name = StrUpr(file_name);
 	if (strcmp(mode, "r") == 0) { modeInt = 1; }
 	else if (strcmp(mode, "w") == 0) { modeInt = 2;}
 	else if (strcmp(mode, "rw") == 0 || strcmp(mode, "wr") == 0) {
 		modeInt = 3;
 	}
 
-	temp = SearchForFileInDirectory(file_name, open_files);
-	if(temp != NULL){
+	temp = SearchForFileInOpenFiles(file_name, open_files);
+	if(temp != -1){
 		char* md;
-		switch(temp->mode){
+		switch(open_files.files[temp].mode){
 		case 1: md = "r"; break;
 		case 2: md = "w"; break;
 		case 3: md = "rw"; break;
@@ -398,8 +392,8 @@ unsigned int Open(char* file_name, char* mode){
 		return 0;		
 	}
 
-	temp = SearchForFileInCurrentDirectory(file_name);
-	if(temp == NULL){
+	f = SearchForFileInCurrentDirectory(file_name);
+	if(f == NULL){
 		fprintf(stderr, 
 			"ERROR: '%s' does not exist in the current directory.\n", file_name);
 		return 0;
@@ -407,13 +401,14 @@ unsigned int Open(char* file_name, char* mode){
 
 	if(open_files.num_files == MAX_OPEN_FILES){
 		fprintf(stderr, 
-			"ERROR: You have reached the maximum number of open files.\n", file_name);
+			"ERROR: You have reached the maximum number of open files.\n");
 		return 0;
 	}
+
 	empty = &open_files.files[max_open_files];
-	strcpy(empty->file_name, temp->file_name);
-	empty->file_attr = temp->file_attr;
-	empty->first_clus_num = temp->first_clus_num;
+	strcpy(empty->file_name, f->file_name);
+	empty->file_attr = f->file_attr;
+	empty->first_clus_num = f->first_clus_num;
 	empty->mode = modeInt;
 	open_files.num_files++; // increments the number of files open 
 	max_open_files++;
@@ -423,20 +418,23 @@ unsigned int Open(char* file_name, char* mode){
 }
 
 unsigned int Close(char* file_name){
-	File* temp;
+	File* f;
+	int temp;
+	file_name = StrUpr(file_name);
 	if(open_files.num_files == 0){
 		fprintf(stderr, "ERROR: '%s' is not an open file.\n", file_name);
 		return 0;
 	}
-	temp = SearchForFileInDirectory(file_name, open_files);
-	if(temp == NULL){
+	temp = SearchForFileInOpenFiles(file_name, open_files);
+	if(temp == -1){
 		fprintf(stderr, "ERROR: '%s' is not an open file.\n", file_name);
 		return 0;
 	}
-	temp->file_name[0] = '\0';
-	temp->file_size = 0;
-	temp->file_attr = 0;
-	temp->mode = -1;
+	f = &open_files.files[temp];
+	f->file_name[0] = '\0';
+	f->file_size = 0;
+	f->file_attr = 0;
+	f->mode = -1;
 	open_files.num_files--;
 
 	printf("'%s' has been successfully closed.\n", file_name);
@@ -452,6 +450,35 @@ unsigned int Create(char* file_name){
 // ABE
 unsigned int Remove(char* file_name){
 
+// int i;
+// 	Directory dir;
+// 	File* next_dir;
+
+// 	if(curr_dir == 0){
+// 		curr_dir = root_clus;
+// 		current_directory = GetDirectoryContents(curr_dir);
+// 	}
+// 	file_name = StrUpr(file_name);
+// 	if(current_directory.num_files == 0){
+// 		fprintf(stderr, "There are no files in the current directory.\n");
+// 		return 0;
+// 	}
+// 	if(curr_dir = root_clus && (strcmp(dir_name, ".") == 0 || strcmp(dir_name, "..") == 0){
+// 		fprintf(stderr, "These files aren't applicable.\n");
+// 		return 1;
+// 	}
+// 	next_dir = SearchForFileInCurrentDirectory(dir_name);
+// 	if(next_dir == NULL){
+// 		fprintf(stderr,
+// 			"ERROR: '%s' could not be found in the current directory.\n", dir_name);
+// 		return 0;
+// 	}
+// 	else if(CheckBitSet(next_dir->file_attr, 4)){
+// 		fprintf(stderr, "ERROR: '%s' is a directory, not a file.\n", dir_name);
+// 		return 0;
+// 	}
+
+
 }
 
 ////////////// ALL EVAN
@@ -462,6 +489,7 @@ unsigned int PrintSize(char* file_name){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
+	file_name = StrUpr(file_name);
 	f = SearchForFileInCurrentDirectory(file_name);
 	if(f == NULL){
 		fprintf(stderr,
@@ -478,6 +506,7 @@ unsigned int ChangeDirectory(char* dir_name){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
+	dir_name = StrUpr(dir_name);
 	next_dir = SearchForFileInCurrentDirectory(dir_name);
 	if(next_dir == NULL){
 		fprintf(stderr,
@@ -503,6 +532,7 @@ unsigned int List(char* dir_name){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
+	dir_name = StrUpr(dir_name);
 	if(current_directory.num_files == 0){
 		fprintf(stderr, "There are no files in the current directory.\n");
 		return 0;
@@ -530,6 +560,7 @@ unsigned int MakeDir(char* dir_name){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
+	dir_name = StrUpr(dir_name);
 	new_dir = SearchForFileInCurrentDirectory(dir_name);
 	if(new_dir != NULL)	{
 		fprintf(stderr,
@@ -546,6 +577,7 @@ unsigned int RemoveDir(char* dir_name){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
+	dir_name = StrUpr(dir_name);
 	new_dir = SearchForFileInCurrentDirectory(dir_name);
 	if(new_dir == NULL)	{
 		fprintf(stderr,
@@ -566,10 +598,86 @@ unsigned int RemoveDir(char* dir_name){
 
 // ABE
 unsigned int ReadFile(char* file_name, unsigned int pos, unsigned int size){
+	File *temp;
+	char msg[size+1];
+	int open, file_begin;
 
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+	}
+
+	file_name = StrUpr(file_name);
+	temp = SearchForFileInCurrentDirectory(file_name);
+	if(temp == NULL){
+		fprintf(stderr,
+			"ERROR: '%s' does not exist in the current directory.\n", file_name);
+		return 0;
+	}
+	open = SearchForFileInOpenFiles(file_name, open_files);
+	if(open == -1){
+		fprintf(stderr,
+			"ERROR: '%s' has not been opened.\n", file_name);
+		return 0;
+	}
+
+	if(open_files.files[open].mode == 2){
+		fprintf(stderr,
+			"ERROR: '%s' has not been opened in read-mode.\n", file_name);
+		return 0;
+	}
+
+	LocateFSC(temp->first_clus_num);
+	printf("FCN: %i\tFSC: %i\n", temp->first_clus_num, LocateFSC(temp->first_clus_num));
+	printf("SECTOR ADR: %i\n", GetSectorAddress(LocateFSC(temp->first_clus_num)));
+
+	file_begin = GetSectorAddress(LocateFSC(temp->first_clus_num));
+
+	fseek(fp, file_begin+pos, SEEK_SET);
+	fread(msg, 1, size, fp);
+
+	printf("MSG: %s\n", msg);
 }
 
 // ABE
 unsigned int WriteToFile(char* file_name, unsigned int pos, unsigned int size,
 	char* msg){
+
+	File *temp, *open_temp;
+	int open, file_begin;
+
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+	}
+	file_name = StrUpr(file_name);
+	temp = SearchForFileInCurrentDirectory(file_name);
+	if(temp == NULL){
+		fprintf(stderr,
+			"ERROR: '%s' does not exist in the current directory.\n", file_name);
+		return 0;
+	}
+	open = SearchForFileInOpenFiles(file_name, open_files);
+	if(open == -1){
+		fprintf(stderr,
+			"ERROR: '%s' has not been opened.\n", file_name);
+		return 0;
+	}
+
+	if(open_files.files[open].mode == 1){
+		fprintf(stderr,
+			"ERROR: '%s' has not been opened in read-mode.\n", file_name);
+		return 0;
+	}
+
+	LocateFSC(temp->first_clus_num);
+	printf("FCN: %i\tFSC: %i\n", temp->first_clus_num, LocateFSC(temp->first_clus_num));
+	printf("SECTOR ADR: %i\n", GetSectorAddress(LocateFSC(temp->first_clus_num)));
+
+	file_begin = GetSectorAddress(LocateFSC(temp->first_clus_num));
+
+	fseek(fp, file_begin+pos, SEEK_SET);
+	fwrite(msg, 1, size, fp);
+
+	printf("MSG: %s\n", msg);
 }
