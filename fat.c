@@ -50,7 +50,7 @@ int main(){
 		if(strcmp(cmd, "open") == 0) {
 			printf("Open\n");
 		} else if(strcmp(cmd, "ls") == 0) {
-			PrintDirectory(root_clus);
+			List("root");
 		} else if(strcmp(cmd, "exit") == 0) {
 		
 			break; // breaks out of loop

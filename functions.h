@@ -4,13 +4,13 @@
 #define DIR_ATTR_OFFSET 11
 #define DIR_ATTR_BYTES 1
 #define DIR_CLUS_HI_OFFSET 20
-#define DIR_CLUS_LOW_OFFSET 26
+#define DIR_CLUS_LO_OFFSET 26
 #define DIR_CLUS_BYTES 2
 #define FILE_SIZE_OFFSET 28
 #define FILE_SIZE_BYTES 4
 
 FILE* fp;
-unsigned int curr_dir;
+unsigned int curr_dir = 0;
 
 unsigned int bytes_per_sec; // offset = 11; size = 2
 unsigned int sec_per_clus;	// offset = 13; size = 1
@@ -25,8 +25,19 @@ unsigned int ExtractData(unsigned int pos, unsigned int size);
 char* RemoveQuotes(char* str);
 void BootSectorInformation();
 void PrintBPS();
-unsigned int PrintDirectory(unsigned int clus_num);
+unsigned int PrintDirectory(unsigned int clus_num, int curr);
 
+typedef struct File{
+	char file_name[12];
+	unsigned int file_size;
+	unsigned int file_attr;
+	unsigned int first_clus_num;
+} File;
+
+typedef struct Directory{
+	File files[32];
+	unsigned int num_files;
+} Directory;
 
 ///////////////////////////////////////////////////////////////////////////////
 //======== HELPER FUNCTIONS ===========//
@@ -42,6 +53,15 @@ void ShowBits(unsigned int x) {
 
 	printf("\n");
 }
+
+void ShowCharBits(unsigned char x) {
+    char i; 
+    for(i=(sizeof(char)*8)-1; i>=0; i--)
+        (x&(1<<i))?putchar('1'):putchar('0');
+
+	printf("\n");
+}
+
 
 unsigned int ExtractData(unsigned int pos, unsigned int size){
 	unsigned int data = 0, temp;
@@ -151,24 +171,42 @@ unsigned int GetAllClustersOfDirectory(unsigned int cluster_num){
 	}
 }
 
-unsigned int PrintDirectory(unsigned int clus_num){
+void PrintDirectoryContents(Directory dir){
+	int i;
+
+	if(dir.num_files == 0){
+		printf("The directory is empty.\n");
+		return;
+	}
+	puts("================================");	
+	for(i = 0; i < dir.num_files; i++){
+		File* temp = &dir.files[i];
+		if(!CheckBitSet(temp->file_attr, 4))
+			printf("%s: ", "F");
+		else
+			printf("%s: ", "D");
+		printf("%s - ", temp->file_name);
+		printf("%i bytes\n", temp->file_size);
+	}
+	puts("================================");	
+}
+
+Directory GetDirectoryContents(unsigned int clus_num){
+	Directory dir_contents;
 	unsigned int dir_fsc;
 	unsigned int dir_adr;
+	unsigned char dir_clus_hi_word;
+	unsigned char dir_clus_lo_word;
 	unsigned char dir_name[12];
 	unsigned char dir_attr;
 	unsigned int i, j, c = 0, dir_size;
 	char ch;
-
-	// Gets all the clusters of the root directory
-	GetAllClustersOfDirectory(clus_num);
-
 	// Locates the first sector of the root directory cluster;
 	dir_fsc = LocateFSC(clus_num);
 	dir_adr = GetSectorAddress(dir_fsc);
 
-	puts("================================");
-
 	for(i = 0; i < (bytes_per_sec*sec_per_clus); i+=32){
+		File temp_file;
 		// Extract Attributes
 		dir_attr = ExtractData(dir_adr+i+DIR_ATTR_OFFSET, DIR_ATTR_BYTES);
 		// Continues on long-name entries.
@@ -187,16 +225,24 @@ unsigned int PrintDirectory(unsigned int clus_num){
 		if(dir_name[0] == ' ')
 			continue;
 
-		if(!CheckBitSet(dir_attr, 4))
-			printf("%s: ", "F");
-		else
-			printf("%s: ", "D");
-		printf("%s\n", dir_name);
-
+		// Extracts File Size
 		dir_size = ExtractData(dir_adr+i+FILE_SIZE_OFFSET, FILE_SIZE_BYTES);
-	}
 
-	puts("================================");
+		dir_clus_hi_word = ExtractData(dir_adr+i+DIR_CLUS_HI_OFFSET, DIR_CLUS_BYTES);
+		dir_clus_lo_word = ExtractData(dir_adr+i+DIR_CLUS_LO_OFFSET, DIR_CLUS_BYTES);
+
+		puts("HI:");
+		ShowCharBits(dir_clus_hi_word);
+		puts("LO:");
+		ShowCharBits(dir_clus_lo_word);
+
+		strcpy(temp_file.file_name, dir_name);
+		temp_file.file_size = dir_size;
+		temp_file.file_attr = dir_attr;
+		dir_contents.files[c++] = temp_file;
+	}
+	dir_contents.num_files = c;
+	return dir_contents;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -247,10 +293,17 @@ unsigned int ChangeDirectory(char* dir_name){
 
 unsigned int List(char* dir_name){
 	unsigned int cluster;
-	// Parse name
-	// Name to cluster
-	cluster = root_clus;
-	PrintDirectory(cluster);
+	Directory dir;
+	if(curr_dir == 0){
+		cluster = root_clus;
+		curr_dir = root_clus;
+	}
+	//dir = GetDirectoryContents(cluster);
+
+	// Search for name
+	// Get new directory contents and print
+
+	PrintDirectoryContents(GetDirectoryContents(cluster));
 }
 
 unsigned int MakeDir(char* dir_name){
