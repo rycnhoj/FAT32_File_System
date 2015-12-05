@@ -52,17 +52,23 @@ int main(){
 		else if(strncmp(cmd, "close", 5) == 0) {}
 		else if(strncmp(cmd, "create", 6) == 0) {}
 		else if(strncmp(cmd, "rm", 2) == 0) {}
-		else if(strncmp(cmd, "size", 4) == 0) {}
+		else if(strncmp(cmd, "size", 4) == 0) {
+			if(strlen(cmd) < 5){
+				fprintf(stderr, "USAGE: size <file_size>\n");
+				continue;
+			}
+			PrintSize(&cmd[5]);
+		}
 		else if(strncmp(cmd, "cd", 2) == 0) {
 			if(strlen(cmd) < 3){
-				fprintf(stderr, "USAGE: cd <directory_name>.\n");
+				fprintf(stderr, "USAGE: cd <directory_name>\n");
 				continue;
 			}
 			ChangeDirectory(&cmd[3]);
 		}
 		else if(strncmp(cmd, "ls", 2) == 0) {
 			if(strlen(cmd) < 3){
-				fprintf(stderr, "USAGE: ls <directory_name>.\n");
+				fprintf(stderr, "USAGE: ls <directory_name>\n");
 				continue;
 			}
 			List(&cmd[3]);

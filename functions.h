@@ -313,7 +313,19 @@ unsigned int Remove(char* file_name){
 ////////////// ALL EVAN
 
 unsigned int PrintSize(char* file_name){
-
+	File* f;
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+	}
+	f = SearchForFileInCurrentDirectory(file_name);
+	if(f == NULL){
+		fprintf(stderr,
+			"ERROR: '%s' could not be found in the current directory.\n", file_name);
+		return 0;
+	}
+	printf("Size of file '%s': %i bytes.\n", file_name, f->file_size);
+	return 1;
 }
 
 unsigned int ChangeDirectory(char* dir_name){
