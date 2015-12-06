@@ -96,7 +96,7 @@ unsigned int ExtractData(unsigned int pos, unsigned int size){
 		data = data | temp;
 		if(size != 0)
 			data = data << SHIFT_AMOUNT;
-		//printf("DATA:\t%i\n", data);
+		//printf("DATA:\t%in", data);
 	}
 	return data;
 }
@@ -168,12 +168,12 @@ void BootSectorInformation(){
 }
 
 void PrintBPS(){
-	printf("Bytes Per Sector:\t%i\n", bytes_per_sec);
-	printf("Sectors Per Cluster:\t%i\n", sec_per_clus);
-	printf("Reserved Sector Count:\t%i\n", rsvd_sec_cnt);
-	printf("Number of Fats:\t\t%i\n", num_fats);
-	printf("FATS Z32:\t\t%i\n", fats_z32);
-	printf("Root Cluster Address:\t%i\n", root_clus);
+	printf("Bytes Per Sector:\t%in", bytes_per_sec);
+	printf("Sectors Per Cluster:\t%in", sec_per_clus);
+	printf("Reserved Sector Count:\t%in", rsvd_sec_cnt);
+	printf("Number of Fats:\tt%in", num_fats);
+	printf("FATS Z32:\tt%in", fats_z32);
+	printf("Root Cluster Address:\t%in", root_clus);
 }
 
 unsigned int GetSectorAddress(unsigned int sec_num){
@@ -358,6 +358,53 @@ File* SearchForFileInCurrentDirectory(char* file_name){
 	return NULL;
 }
 
+int GetFileSlot(unsigned int clus_num, char* file_name){
+	unsigned int dir_fsc;
+	unsigned int dir_adr;
+	unsigned char dir_name[12];
+	unsigned int slot;
+	int i, j;
+	char ch;
+
+	dir_fsc = LocateFSC(clus_num);
+	dir_adr = GetSectorAddress(dir_fsc);
+
+	for(i = 0; i < (bytes_per_sec*sec_per_clus); i+=32){
+		// Extracts File name - max 11 chars
+		for(j = 0; j < DIR_NAME_BYTES; j++){
+			ch = ExtractData(dir_adr+i+j, 1);
+			if(ch != 0)
+				dir_name[j] = ch;
+			else
+				dir_name[j] = ' ';
+		}
+		dir_name[DIR_NAME_BYTES] = 0;
+		if(strncmp(file_name, dir_name, strlen(file_name)) == 0)
+			return dir_adr+i;
+	}
+	return -1;
+}
+
+
+int GetNextOpenSlot(unsigned int clus_num){
+	unsigned int dir_fsc;
+	unsigned int dir_adr;
+	unsigned int slot;
+	int i;
+
+	dir_fsc = LocateFSC(clus_num);
+	dir_adr = GetSectorAddress(dir_fsc);
+
+	for(i = 0; i < (bytes_per_sec*sec_per_clus); i+=32){
+		slot = ExtractData(dir_adr+i, 1);
+		if(slot == 0){
+			return dir_adr+i;
+		}
+	}
+
+	return -1;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //========== MAIN FUNCTIONS ===========//
 /* FOR ALL FUNCTIONS: Return 1 on success, 0 on error **/
@@ -442,43 +489,69 @@ unsigned int Close(char* file_name){
 }
 
 unsigned int Create(char* file_name){
+	File* f;
+	char buffer[32];
+	int slot_adr;
 
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+	}
+	file_name = StrUpr(file_name);
+	file_name = RemovePeriods(file_name);
+	f = SearchForFileInCurrentDirectory(file_name);
+	if(f != NULL){
+		fprintf(stderr,
+			"ERROR: '%s' already exists in the current directory.\n", file_name);
+		return 0;
+	}
+
+	sprintf(buffer, "%-11s%1c%s%s%s%s%s", file_name, '.', "\00000000", "\00", "\0000","\05", "\0000");
+	
+	slot_adr = GetNextOpenSlot(curr_dir);
+	if(slot_adr == -1){
+		fprintf(stderr, "ERROR: Directory full.\n");
+		return 0;
+	}
+
+	fseek(fp, slot_adr, SEEK_SET);
+	fwrite(buffer, 1, 32, fp);
+	fflush(fp);
 }
 
 //////////////
 
 // ABE
 unsigned int Remove(char* file_name){
+	File* f;
+	char buffer[32];
+	int slot_adr;
 
-// int i;
-// 	Directory dir;
-// 	File* next_dir;
+	if(curr_dir == 0){
+		curr_dir = root_clus;
+		current_directory = GetDirectoryContents(curr_dir);
+	}
+	file_name = StrUpr(file_name);
+	file_name = RemovePeriods(file_name);
+	f = SearchForFileInCurrentDirectory(file_name);
+	if(f == NULL){
+		fprintf(stderr,
+			"ERROR: '%s' does not exist in the current directory.\n", file_name);
+		return 0;
+	}
 
-// 	if(curr_dir == 0){
-// 		curr_dir = root_clus;
-// 		current_directory = GetDirectoryContents(curr_dir);
-// 	}
-// 	file_name = StrUpr(file_name);
-// 	if(current_directory.num_files == 0){
-// 		fprintf(stderr, "There are no files in the current directory.\n");
-// 		return 0;
-// 	}
-// 	if(curr_dir = root_clus && (strcmp(dir_name, ".") == 0 || strcmp(dir_name, "..") == 0){
-// 		fprintf(stderr, "These files aren't applicable.\n");
-// 		return 1;
-// 	}
-// 	next_dir = SearchForFileInCurrentDirectory(dir_name);
-// 	if(next_dir == NULL){
-// 		fprintf(stderr,
-// 			"ERROR: '%s' could not be found in the current directory.\n", dir_name);
-// 		return 0;
-// 	}
-// 	else if(CheckBitSet(next_dir->file_attr, 4)){
-// 		fprintf(stderr, "ERROR: '%s' is a directory, not a file.\n", dir_name);
-// 		return 0;
-// 	}
+	sprintf(buffer, 
+		"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+	
+	slot_adr = GetFileSlot(curr_dir, file_name);
+	if(slot_adr == -1){
+		fprintf(stderr, "ERROR: File not found.\n");
+		return 0;
+	}
 
-
+	fseek(fp, slot_adr, SEEK_SET);
+	fwrite(buffer, 1, 32, fp);
+	fflush(fp);
 }
 
 ////////////// ALL EVAN
@@ -532,6 +605,7 @@ unsigned int List(char* dir_name){
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
+	fflush(fp);
 	dir_name = StrUpr(dir_name);
 	if(current_directory.num_files == 0){
 		fprintf(stderr, "There are no files in the current directory.\n");
@@ -628,15 +702,15 @@ unsigned int ReadFile(char* file_name, unsigned int pos, unsigned int size){
 	}
 
 	LocateFSC(temp->first_clus_num);
-	printf("FCN: %i\tFSC: %i\n", temp->first_clus_num, LocateFSC(temp->first_clus_num));
-	printf("SECTOR ADR: %i\n", GetSectorAddress(LocateFSC(temp->first_clus_num)));
+	printf("FCN: %itFSC: %in", temp->first_clus_num, LocateFSC(temp->first_clus_num));
+	printf("SECTOR ADR: %in", GetSectorAddress(LocateFSC(temp->first_clus_num)));
 
 	file_begin = GetSectorAddress(LocateFSC(temp->first_clus_num));
 
 	fseek(fp, file_begin+pos, SEEK_SET);
 	fread(msg, 1, size, fp);
 
-	printf("MSG: %s\n", msg);
+	printf("MSG: %sn", msg);
 }
 
 // ABE
@@ -671,13 +745,9 @@ unsigned int WriteToFile(char* file_name, unsigned int pos, unsigned int size,
 	}
 
 	LocateFSC(temp->first_clus_num);
-	printf("FCN: %i\tFSC: %i\n", temp->first_clus_num, LocateFSC(temp->first_clus_num));
-	printf("SECTOR ADR: %i\n", GetSectorAddress(LocateFSC(temp->first_clus_num)));
 
 	file_begin = GetSectorAddress(LocateFSC(temp->first_clus_num));
 
 	fseek(fp, file_begin+pos, SEEK_SET);
 	fwrite(msg, 1, size, fp);
-
-	printf("MSG: %s\n", msg);
 }

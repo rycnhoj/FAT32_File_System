@@ -76,8 +76,20 @@ int main(){
 			sscanf(cmd, "%*s %s", fileName);
 			Close(fileName);
 		}
-		else if(strncmp(cmd, "create", 6) == 0) {}
-		else if(strncmp(cmd, "rm", 2) == 0) {}
+		else if(strncmp(cmd, "create", 6) == 0) {
+			if(strlen(cmd) < 7){
+				fprintf(stderr, "USAGE: create <FILE_NAME>\n");
+				continue;
+			}
+			Create(&cmd[7]);
+		}
+		else if(strncmp(cmd, "rm", 2) == 0) {
+			if(strlen(cmd) < 3){
+				fprintf(stderr, "USAGE: rm <FILE_NAME>\n");
+				continue;
+			}
+			Remove(&cmd[3]);
+		}
 		else if(strncmp(cmd, "size", 4) == 0) {
 			if(strlen(cmd) < 5){
 				fprintf(stderr, "USAGE: size <FILE_SIZE>\n");
