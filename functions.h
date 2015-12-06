@@ -28,6 +28,7 @@ void BootSectorInformation();
 void PrintBPS();
 unsigned int PrintDirectory(unsigned int clus_num, int curr);
 
+// File object stucture
 typedef struct File{
 	char file_name[12];
 	unsigned int file_size;
@@ -36,25 +37,28 @@ typedef struct File{
 	unsigned int mode;
 } File;
 
+// Directory object structure
 typedef struct Directory{
 	File files[MAX_OPEN_FILES];
 	unsigned int num_files;
 } Directory;
 
-FILE* fp;
-unsigned int curr_dir = 0;
-Directory current_directory;
-Directory open_files;
-unsigned int max_open_files;
+FILE* fp;					// Global file pointer
+unsigned int curr_dir = 0;	// The current directory cluster number
+Directory current_directory;	// The Directory object for the current
+Directory open_files;			// The Directory object for the open files
+unsigned int max_open_files;	// The maximum index of the open files
 
 
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 //======== HELPER FUNCTIONS ===========//
 
+// Checks if the nth bit is set
 int CheckBitSet(unsigned char c, int n) {
     return ((1 << n) & c);
 }
 
+// Prints out the individual bits of an unsigned int
 void ShowBits(unsigned int x) {
     int i; 
     for(i=(sizeof(int)*8)-1; i>=0; i--)
@@ -63,6 +67,7 @@ void ShowBits(unsigned int x) {
 	printf("\n");
 }
 
+// Prints out the individual bit of an unsigned char
 void ShowCharBits(unsigned char x) {
     char i; 
     for(i=(sizeof(char)*8)-1; i>=0; i--)
@@ -71,6 +76,7 @@ void ShowCharBits(unsigned char x) {
 	printf("\n");
 }
 
+// Converts a cstring to all uppercase letters
 char* StrUpr(char *str) {
   size_t i;
   size_t len = strlen(str);
@@ -81,6 +87,7 @@ char* StrUpr(char *str) {
   return str;
 }
 
+// Extracts data in little-endian order from pos to size
 unsigned int ExtractData(unsigned int pos, unsigned int size){
 	unsigned int data = 0, temp;
 	int ch;
@@ -101,6 +108,7 @@ unsigned int ExtractData(unsigned int pos, unsigned int size){
 	return data;
 }
 
+// Removes quotes from a string
 char* RemoveQuotes(char* str){
 	char* ret;
 
@@ -110,6 +118,7 @@ char* RemoveQuotes(char* str){
 	return ret;
 }
 
+// Removes periods from a string
 char * RemovePeriods(char * str) {
     int i = 0;
 
@@ -122,7 +131,7 @@ char * RemovePeriods(char * str) {
     return str;
 }
 
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 //======= FILE SYSTEM FUNCTIONS =======//
 
 /** 
@@ -136,22 +145,25 @@ unsigned int LocateFSC(unsigned int clus_num){
 	return fsc;
 }
 
+// Returns the Sector number of a cluster in the FAT table
 unsigned int ThisFATSecNum(unsigned int clus_num){
 	unsigned int FATOff;
 	unsigned int tfsn;
 
-	FATOff = clus_num * 4;	// This is due to FAT32; check pg. 15 in MS writeup
+	FATOff = clus_num * 4;
 	tfsn = rsvd_sec_cnt + (FATOff / bytes_per_sec);
 	return tfsn;
 }
 
+// Returns the offset of a cluster in the FAT table
 unsigned int ThisFATEntOffset(unsigned int clus_num){
 	unsigned int FATOff;
 
-	FATOff = clus_num * 4;	// This is due to FAT32; check pg. 15 in MS writeup
+	FATOff = clus_num * 4;
 	return FATOff % bytes_per_sec;
 }
 
+// Extracts all vital information from the boot sector
 void BootSectorInformation(){
 	unsigned int rds;	// Root Directory Sectors
 
@@ -167,6 +179,7 @@ void BootSectorInformation(){
 	fds = rsvd_sec_cnt + (num_fats * fats_z32) + rds;
 }
 
+// Prints all vital information from the boot sector
 void PrintBPS(){
 	printf("Bytes Per Sector:\t%in", bytes_per_sec);
 	printf("Sectors Per Cluster:\t%in", sec_per_clus);
@@ -176,10 +189,12 @@ void PrintBPS(){
 	printf("Root Cluster Address:\t%in", root_clus);
 }
 
+// Gets the decimal address of a sector
 unsigned int GetSectorAddress(unsigned int sec_num){
 	return sec_num * (bytes_per_sec * sec_per_clus);
 }
 
+// Gets all the clusters associated with a file
 unsigned int GetAllClustersOfDirectory(unsigned int cluster_num){
 	unsigned int next_clus;
 	unsigned int tfsn;
@@ -199,16 +214,14 @@ unsigned int GetAllClustersOfDirectory(unsigned int cluster_num){
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 
+// Sets the number of files in the current directory container to 0
 void ClearCurrentDirectory(){
-	// int i;
-	// for(i = 0; i < current_directory.num_files; i++){
-	// 	current_directory.files[i] = 0;
-	// }
 	current_directory.num_files = 0;
 }
 
+// Prints the contents of the passed in Directory object
 void PrintDirectoryContents(Directory dir){
 	int i;
 
@@ -230,6 +243,7 @@ void PrintDirectoryContents(Directory dir){
 	puts("================================");	
 }
 
+// Prints the contents of the Open Files container
 void PrintOpenFiles(Directory dir){
 	int i;
 
@@ -261,6 +275,7 @@ void PrintOpenFiles(Directory dir){
 	puts("================================");	
 }
 
+// Extracts contents of a Directory with the passed-in cluster number
 Directory GetDirectoryContents(unsigned int clus_num){
 	Directory dir_contents;
 	unsigned int dir_fsc;
@@ -299,14 +314,13 @@ Directory GetDirectoryContents(unsigned int clus_num){
 		// Extracts File Size
 		dir_size = ExtractData(dir_adr+i+FILE_SIZE_OFFSET, FILE_SIZE_BYTES);
 
-		dir_clus_hi_word = ExtractData(dir_adr+i+DIR_CLUS_HI_OFFSET, DIR_CLUS_BYTES);
-		dir_clus_lo_word = ExtractData(dir_adr+i+DIR_CLUS_LO_OFFSET, DIR_CLUS_BYTES);
+		dir_clus_hi_word = ExtractData(dir_adr+i+DIR_CLUS_HI_OFFSET,
+										DIR_CLUS_BYTES);
+		dir_clus_lo_word = ExtractData(dir_adr+i+DIR_CLUS_LO_OFFSET,
+										DIR_CLUS_BYTES);
 
 		dir_clus_hi_word << 16;
 		dir_clus = dir_clus_hi_word | dir_clus_lo_word;
-
-		//printf("CLUS: %i", dir_clus);
-		//ShowBits(dir_clus);
 
 		strcpy(temp_file.file_name, dir_name);
 		temp_file.file_size = dir_size;
@@ -318,6 +332,7 @@ Directory GetDirectoryContents(unsigned int clus_num){
 	return dir_contents;
 }
 
+// Searches for the first empty slot in a directory
 File* SearchForFirstEmptyFileInDirectory(Directory dir){
 	File* temp;
 	int i;
@@ -334,6 +349,7 @@ File* SearchForFirstEmptyFileInDirectory(Directory dir){
 	return NULL;
 }
 
+// Returns the index for a certain file in the open files table
 int SearchForFileInOpenFiles(char* file_name, Directory dir){
 	File* temp;
 	int i;
@@ -346,6 +362,7 @@ int SearchForFileInOpenFiles(char* file_name, Directory dir){
 	return -1;
 }
 
+// Searches for a file name in the current directory
 File* SearchForFileInCurrentDirectory(char* file_name){
 	File* temp;
 	int i;
@@ -358,6 +375,7 @@ File* SearchForFileInCurrentDirectory(char* file_name){
 	return NULL;
 }
 
+// Returns the address of the slot of a short-name file entry in a directory
 int GetFileSlot(unsigned int clus_num, char* file_name){
 	unsigned int dir_fsc;
 	unsigned int dir_adr;
@@ -385,7 +403,7 @@ int GetFileSlot(unsigned int clus_num, char* file_name){
 	return -1;
 }
 
-
+// Returns the address of the next free slot of a directory
 int GetNextOpenSlot(unsigned int clus_num){
 	unsigned int dir_fsc;
 	unsigned int dir_adr;
@@ -405,11 +423,11 @@ int GetNextOpenSlot(unsigned int clus_num){
 	return -1;
 }
 
-///////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 //========== MAIN FUNCTIONS ===========//
 /* FOR ALL FUNCTIONS: Return 1 on success, 0 on error **/
 
-////////////// ALL JOHN
+// Adds a file to the open file table with the passed-in mode
 unsigned int Open(char* file_name, char* mode){
 	File *f, *empty;
 	int temp;
@@ -435,14 +453,16 @@ unsigned int Open(char* file_name, char* mode){
 		default: md = "error"; break;
 		}
 		fprintf(stderr, 
-			"ERROR: '%s' is already opened, with mode '%s'.\n", file_name, md);
+			"ERROR: '%s' is already opened, with mode '%s'.\n",
+			 file_name, md);
 		return 0;		
 	}
 
 	f = SearchForFileInCurrentDirectory(file_name);
 	if(f == NULL){
 		fprintf(stderr, 
-			"ERROR: '%s' does not exist in the current directory.\n", file_name);
+			"ERROR: '%s' does not exist in the current directory.\n",
+			 file_name);
 		return 0;
 	}
 
@@ -457,13 +477,14 @@ unsigned int Open(char* file_name, char* mode){
 	empty->file_attr = f->file_attr;
 	empty->first_clus_num = f->first_clus_num;
 	empty->mode = modeInt;
-	open_files.num_files++; // increments the number of files open 
+	open_files.num_files++; 
 	max_open_files++;
 
 	printf("'%s' has been successfully opened.\n", file_name);
 	PrintOpenFiles(open_files);
 }
 
+// Removes a file from the open file table.
 unsigned int Close(char* file_name){
 	File* f;
 	int temp;
@@ -488,6 +509,8 @@ unsigned int Close(char* file_name){
 	PrintOpenFiles(open_files);
 }
 
+// Creates a file in the current directory
+// NOTE: Does not properly assign values
 unsigned int Create(char* file_name){
 	File* f;
 	char buffer[32];
@@ -499,29 +522,32 @@ unsigned int Create(char* file_name){
 	}
 	file_name = StrUpr(file_name);
 	file_name = RemovePeriods(file_name);
+	
 	f = SearchForFileInCurrentDirectory(file_name);
+
 	if(f != NULL){
 		fprintf(stderr,
-			"ERROR: '%s' already exists in the current directory.\n", file_name);
+			"ERROR: '%s' already exists in the current directory.\n",
+			 file_name);
 		return 0;
 	}
 
-	sprintf(buffer, "%-11s%1c%s%s%s%s%s", file_name, '.', "\00000000", "\00", "\0000","\05", "\0000");
+	// sprintf(buffer, "%-11s%1c%s%s%s%s%s", file_name, '.',
+	// 		"\00000000", "\00", "\0000","\05", "\0000");
 	
-	slot_adr = GetNextOpenSlot(curr_dir);
-	if(slot_adr == -1){
-		fprintf(stderr, "ERROR: Directory full.\n");
-		return 0;
-	}
+	// slot_adr = GetNextOpenSlot(curr_dir);
+	// if(slot_adr == -1){
+	// 	fprintf(stderr, "ERROR: Directory full.\n");
+	// 	return 0;
+	// }
 
-	fseek(fp, slot_adr, SEEK_SET);
-	fwrite(buffer, 1, 32, fp);
-	fflush(fp);
+	// fseek(fp, slot_adr, SEEK_SET);
+	// fwrite(buffer, 1, 32, fp);
+	// fflush(fp);
 }
 
-//////////////
-
-// ABE
+// Deletes a file from the current working directory.
+// NOTE: INCOMPLETE: Does not actually remove the file entry from the directory
 unsigned int Remove(char* file_name){
 	File* f;
 	char buffer[32];
@@ -536,26 +562,32 @@ unsigned int Remove(char* file_name){
 	f = SearchForFileInCurrentDirectory(file_name);
 	if(f == NULL){
 		fprintf(stderr,
-			"ERROR: '%s' does not exist in the current directory.\n", file_name);
+			"ERROR: '%s' does not exist in the current directory.\n",
+			 file_name);
 		return 0;
 	}
 
-	sprintf(buffer, 
-		"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+	printf("Theoretically, there is where we would remove the file.\n");
+
+	// Our strategy here was to overwrite the short-name entry with all 0s,
+	// but we have commented out the code in order to avoid corrupting 
+	// the image file.
+
+	// sprintf(buffer, 
+	// 	"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
 	
-	slot_adr = GetFileSlot(curr_dir, file_name);
-	if(slot_adr == -1){
-		fprintf(stderr, "ERROR: File not found.\n");
-		return 0;
-	}
+	// slot_adr = GetFileSlot(curr_dir, file_name);
+	// if(slot_adr == -1){
+	// 	fprintf(stderr, "ERROR: File not found.\n");
+	// 	return 0;
+	// }
 
-	fseek(fp, slot_adr, SEEK_SET);
-	fwrite(buffer, 1, 32, fp);
-	fflush(fp);
+	// fseek(fp, slot_adr, SEEK_SET);
+	// fwrite(buffer, 1, 32, fp);
+	// fflush(fp);
 }
 
-////////////// ALL EVAN
-
+// Prints the size of a file to screen
 unsigned int PrintSize(char* file_name){
 	File* f;
 	if(curr_dir == 0){
@@ -566,13 +598,16 @@ unsigned int PrintSize(char* file_name){
 	f = SearchForFileInCurrentDirectory(file_name);
 	if(f == NULL){
 		fprintf(stderr,
-			"ERROR: '%s' could not be found in the current directory.\n", file_name);
+			"ERROR: '%s' could not be found in the current directory.\n",
+			 file_name);
 		return 0;
 	}
 	printf("Size of file '%s': %i bytes.\n", file_name, f->file_size);
 	return 1;
 }
 
+// Changes the current working directory if it is a child of the
+// the previous working directory
 unsigned int ChangeDirectory(char* dir_name){
 	File* next_dir;
 	if(curr_dir == 0){
@@ -583,7 +618,8 @@ unsigned int ChangeDirectory(char* dir_name){
 	next_dir = SearchForFileInCurrentDirectory(dir_name);
 	if(next_dir == NULL){
 		fprintf(stderr,
-			"ERROR: '%s' could not be found in the current directory.\n", dir_name);
+			"ERROR: '%s' could not be found in the current directory.\n",
+			 dir_name);
 		return 0;
 	}
 	else if(!CheckBitSet(next_dir->file_attr, 4)){
@@ -596,6 +632,7 @@ unsigned int ChangeDirectory(char* dir_name){
 	current_directory = GetDirectoryContents(curr_dir);
 }
 
+// Performs the ls function on the passed-in directory name
 unsigned int List(char* dir_name){
 	int i;
 	Directory dir;
@@ -618,7 +655,8 @@ unsigned int List(char* dir_name){
 	next_dir = SearchForFileInCurrentDirectory(dir_name);
 	if(next_dir == NULL){
 		fprintf(stderr,
-			"ERROR: '%s' could not be found in the current directory.\n", dir_name);
+			"ERROR: '%s' could not be found in the current directory.\n",
+			 dir_name);
 		return 0;
 	}
 	else if(!CheckBitSet(next_dir->file_attr, 4)){
@@ -628,6 +666,9 @@ unsigned int List(char* dir_name){
 	PrintDirectoryContents(GetDirectoryContents(next_dir->first_clus_num));
 }
 
+// Creates a Directory in the current working directory
+// INCOMPLETE: Does not actually add entries to the file system
+// Only throws error in the case that the entry already exists
 unsigned int MakeDir(char* dir_name){
 	File* new_dir;
 	if(curr_dir == 0){
@@ -638,13 +679,18 @@ unsigned int MakeDir(char* dir_name){
 	new_dir = SearchForFileInCurrentDirectory(dir_name);
 	if(new_dir != NULL)	{
 		fprintf(stderr,
-			"ERROR: '%s' already exists in the current directory.\n", dir_name);
+			"ERROR: '%s' already exists in the current directory.\n",
+			 dir_name);
 		return 0;
 	}
 
 	// ADD DIRECTORY ENTRY IN HERE
 }
 
+// Removes an empty directory from the current working directory
+// INCOMPLETE: Does not actually remove entries. 
+// Currently only checks if the passed-in file name exists
+// or is a file.
 unsigned int RemoveDir(char* dir_name){
 	File* new_dir;
 	if(curr_dir == 0){
@@ -655,7 +701,8 @@ unsigned int RemoveDir(char* dir_name){
 	new_dir = SearchForFileInCurrentDirectory(dir_name);
 	if(new_dir == NULL)	{
 		fprintf(stderr,
-			"ERROR: '%s' does not exist in the current directory.\n", dir_name);
+			"ERROR: '%s' does not exist in the current directory.\n",
+			 dir_name);
 		return 0;
 	}
 	else if(!CheckBitSet(new_dir->file_attr, 4)){
@@ -668,9 +715,9 @@ unsigned int RemoveDir(char* dir_name){
 	// REMOVE DIRECTORY HERE
 }
 
-//////////////
-
-// ABE
+// Reads a file with name 'file_name' at position 'pos' with size 'size'.
+// INCOMPLETE: If spanning more than one sector, does not currently jump 
+// to next sector.
 unsigned int ReadFile(char* file_name, unsigned int pos, unsigned int size){
 	File *temp;
 	char msg[size+1];
@@ -681,11 +728,19 @@ unsigned int ReadFile(char* file_name, unsigned int pos, unsigned int size){
 		current_directory = GetDirectoryContents(curr_dir);
 	}
 
+	if(pos > 512){
+		fprintf(stderr,
+			"ERROR: '%d' is outside the 'read' limitations of 512 bytes.\n",
+			 pos);
+		return 0;
+	}
+
 	file_name = StrUpr(file_name);
 	temp = SearchForFileInCurrentDirectory(file_name);
 	if(temp == NULL){
 		fprintf(stderr,
-			"ERROR: '%s' does not exist in the current directory.\n", file_name);
+			"ERROR: '%s' does not exist in the current directory.\n",
+			 file_name);
 		return 0;
 	}
 	open = SearchForFileInOpenFiles(file_name, open_files);
@@ -702,18 +757,22 @@ unsigned int ReadFile(char* file_name, unsigned int pos, unsigned int size){
 	}
 
 	LocateFSC(temp->first_clus_num);
-	printf("FCN: %itFSC: %in", temp->first_clus_num, LocateFSC(temp->first_clus_num));
-	printf("SECTOR ADR: %in", GetSectorAddress(LocateFSC(temp->first_clus_num)));
-
 	file_begin = GetSectorAddress(LocateFSC(temp->first_clus_num));
 
+	if(pos+size > 512){
+		fprintf(stderr, "WARNING: Read bound limit reached.\n");
+		size = 512 - pos;
+	}
+
 	fseek(fp, file_begin+pos, SEEK_SET);
+
 	fread(msg, 1, size, fp);
 
-	printf("MSG: %sn", msg);
+	printf("%s\n", msg);
 }
 
-// ABE
+// Writes 'msg' to address associated with passed-in 'file_name'
+// INCOMPLETE: Does not account for message sizes greater than one cluster.
 unsigned int WriteToFile(char* file_name, unsigned int pos, unsigned int size,
 	char* msg){
 
@@ -724,11 +783,20 @@ unsigned int WriteToFile(char* file_name, unsigned int pos, unsigned int size,
 		curr_dir = root_clus;
 		current_directory = GetDirectoryContents(curr_dir);
 	}
+
+	if(pos > 512){
+		fprintf(stderr,
+			"ERROR: '%d' is outside the 'Write' limitations of 512 bytes.\n",
+			 pos);
+		return 0;
+	}
+
 	file_name = StrUpr(file_name);
 	temp = SearchForFileInCurrentDirectory(file_name);
 	if(temp == NULL){
 		fprintf(stderr,
-			"ERROR: '%s' does not exist in the current directory.\n", file_name);
+			"ERROR: '%s' does not exist in the current directory.\n",
+			 file_name);
 		return 0;
 	}
 	open = SearchForFileInOpenFiles(file_name, open_files);
@@ -744,9 +812,16 @@ unsigned int WriteToFile(char* file_name, unsigned int pos, unsigned int size,
 		return 0;
 	}
 
+	msg = RemoveQuotes(msg);
+
 	LocateFSC(temp->first_clus_num);
 
 	file_begin = GetSectorAddress(LocateFSC(temp->first_clus_num));
+
+	if(pos+size > 512){
+		fprintf(stderr, "WARNING: 'Write' bound limit reached.\n");
+		size = 512 - pos;
+	}
 
 	fseek(fp, file_begin+pos, SEEK_SET);
 	fwrite(msg, 1, size, fp);

@@ -22,7 +22,7 @@ static char* getCmd() {
 	if (fgets(cmdLine, 128, stdin) == NULL)
 		return NULL;
 
-	return cmdLine; // returns cmdLine string
+	return cmdLine;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -39,15 +39,22 @@ int main(){
 	}
 	cmd = (char*) malloc (128);
 
-	puts("*****************************");
-	BootSectorInformation();
-	PrintBPS();
-	printf("First Data Sector:\t%i\n", fds);
-	printf("Root Directory:\t\t%i\n", LocateFSC(root_clus));
-	puts("*****************************");
+	// This prints Boot Sector Information, and is commented
+	// out for debugging.
 
+	BootSectorInformation();
+	// puts("*****************************");
+	// 
+	// PrintBPS();
+	// printf("First Data Sector:\t%i\n", fds);
+	// printf("Root Directory:\t\t%i\n", LocateFSC(root_clus));
+	// puts("*****************************");
+
+
+	// Main while loop
 	while((cmd = getCmd()) != NULL) {
 		cmd[strlen(cmd)-1] = '\0';
+		// OPEN
 		if(strncmp(cmd, "open", 4) == 0) {
 			if(strlen(cmd) < 5){
 				fprintf(stderr, "USAGE: open <FILE_NAME> <MODE>\n");
@@ -56,7 +63,7 @@ int main(){
 			char fileName[12];
 			char mode[3];
 			sscanf(cmd, "%*s %s %s", fileName, mode);
-			printf("FN: %s\tMODE: %s\n", fileName, mode);
+			// printf("FN: %s\tMODE: %s\n", fileName, mode);
 			if (strpbrk(mode, "rw") == NULL){
 				fprintf(stderr, "ERROR: '%s' is an invalid mode.\n", mode);
 				fprintf(stderr, "Available modes:\n");
@@ -67,6 +74,7 @@ int main(){
 			}
 			Open(fileName, mode);
 		} 
+		// CLOSE
 		else if(strncmp(cmd, "close", 5) == 0) {
 			if(strlen(cmd) < 5){
 				fprintf(stderr, "USAGE: close <FILE_NAME>\n");
@@ -76,6 +84,7 @@ int main(){
 			sscanf(cmd, "%*s %s", fileName);
 			Close(fileName);
 		}
+		// CREATE
 		else if(strncmp(cmd, "create", 6) == 0) {
 			if(strlen(cmd) < 7){
 				fprintf(stderr, "USAGE: create <FILE_NAME>\n");
@@ -83,6 +92,7 @@ int main(){
 			}
 			Create(&cmd[7]);
 		}
+		// REMOVE
 		else if(strncmp(cmd, "rm", 2) == 0) {
 			if(strlen(cmd) < 3){
 				fprintf(stderr, "USAGE: rm <FILE_NAME>\n");
@@ -90,6 +100,7 @@ int main(){
 			}
 			Remove(&cmd[3]);
 		}
+		// SIZE
 		else if(strncmp(cmd, "size", 4) == 0) {
 			if(strlen(cmd) < 5){
 				fprintf(stderr, "USAGE: size <FILE_SIZE>\n");
@@ -97,6 +108,7 @@ int main(){
 			}
 			PrintSize(&cmd[5]);
 		}
+		// CD
 		else if(strncmp(cmd, "cd", 2) == 0) {
 			if(strlen(cmd) < 3){
 				fprintf(stderr, "USAGE: cd <DIR_NAME>\n");
@@ -104,6 +116,7 @@ int main(){
 			}
 			ChangeDirectory(&cmd[3]);
 		}
+		// LS
 		else if(strncmp(cmd, "ls", 2) == 0) {
 			if(strlen(cmd) < 3){
 				fprintf(stderr, "USAGE: ls <DIR_NAME>\n");
@@ -111,6 +124,7 @@ int main(){
 			}
 			List(&cmd[3]);
 		} 
+		// MKDIR
 		else if(strncmp(cmd, "mkdir", 5) == 0) {
 			if(strlen(cmd) < 6){
 				fprintf(stderr, "USAGE: mkdir <DIR_NAME>\n");
@@ -118,6 +132,7 @@ int main(){
 			}
 			MakeDir(&cmd[6]);
 		}
+		// RMDIR
 		else if(strncmp(cmd, "rmdir", 5) == 0) {
 			if(strlen(cmd) < 6){
 				fprintf(stderr, "USAGE: rmdir <DIR_NAME>\n");
@@ -125,9 +140,11 @@ int main(){
 			}
 			RemoveDir(&cmd[6]);
 		}
+		// READ
 		else if(strncmp(cmd, "read", 4) == 0) {
 			if(strlen(cmd) < 5){
-				fprintf(stderr, "USAGE: read <FILE_NAME> <POS> <NUM_BYTES>\n");
+				fprintf(stderr, 
+					"USAGE: read <FILE_NAME> <POS> <NUM_BYTES>\n");
 				continue;
 			}
 			char fileName[12];
@@ -135,9 +152,11 @@ int main(){
 			sscanf(cmd, "%*s %s %i %i", fileName, &pos, &size);
 			ReadFile(fileName, pos, size);
 		}
+		// WRITE
 		else if(strncmp(cmd, "write", 5) == 0) {
 			if(strlen(cmd) < 5){
-				fprintf(stderr, "USAGE: write <FILE_NAME> <POS> <NUM_BYTES> <STRING>\n");
+				fprintf(stderr,
+				 "USAGE: write <FILE_NAME> <POS> <NUM_BYTES> <STRING>\n");
 				continue;
 			}
 			char fileName[12], msg[1024];
@@ -145,9 +164,11 @@ int main(){
 			sscanf(cmd, "%*s %s %i %i %s", fileName, &pos, &size, msg);
 			WriteToFile(fileName, pos, size, msg);
 		}
+		// EXIT
 		else if(strncmp(cmd, "exit", 4) == 0) {
 			break; // breaks out of loop
 		} 
+		// ALL OTHERS
 		else {
 			fprintf(stderr, "ERROR: '%s' is not a supported command.\n", cmd);
 		}
