@@ -3,9 +3,9 @@
 
 ##### Group Members
 
-* Evan Lee (El12b)
-* John Cyr(Jrc11v)
-* Abraheem Omari(Afo12)
+* Evan Lee (el12b)
+* John Cyr (jrc11v)
+* Abraheem Omari (afo12)
 
 ##### Tar Archive / Files
 
