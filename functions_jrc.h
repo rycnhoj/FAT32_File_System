@@ -241,8 +241,12 @@ unsigned int PrintDirectory(unsigned int clus_num){
 void printFileTable () {
 		printf("-------------------------------\n");
 		for (int i = 0; i < numberOfFiles; ++i) {
-			if(fileTable[i].fileName != NULL && fileTable[i].location != NULL)
-				printf("%s\t: %u \t: %d\n", fileTable[i].fileName, fileTable[i].location, fileTable[i].mode);
+			if(fileTable[i].fileName != NULL && 
+			   fileTable[i].location != NULL)
+				printf("%s\t: %u \t: %d\n",
+					fileTable[i].fileName, 
+					fileTable[i].location, 
+					fileTable[i].mode);
 		}
 		printf("-------------------------------\n");
 }
@@ -254,7 +258,8 @@ unsigned int Open(char* file_name, char* mode){
 	if (mode == NULL) { modeInt = 0; } else {
 		if (strcmp(mode, "r") == 0) { modeInt = 1; }
 		if (strcmp(mode, "w") == 0) { modeInt = 2;}
-		if (strcmp(mode, "rw") == 0 || strcmp(mode, "wr") == 0) { modeInt = 3;}
+		if (strcmp(mode, "rw") == 0 || strcmp(mode, "wr") == 0) 
+			{ modeInt = 3;}
 	}
 
 	// if(modeInt <= 0){
@@ -269,9 +274,13 @@ unsigned int Open(char* file_name, char* mode){
 	if( results == 1) { 
 		printFileTable();
 	} else if (results == 2) {
-		fprintf(stderr, "ERROR: %s - file is already open.\n", file_name);
+		fprintf(stderr,
+			"ERROR: %s - file is already open.\n",
+			file_name);
 	} else if (results == 0) {
-		fprintf(stderr, "ERROR: %s - file not in current directory.\n", file_name);
+		fprintf(stderr,
+		"ERROR: %s - file not in current directory.\n",
+		file_name);
 	}
 }
 
@@ -428,48 +437,4 @@ unsigned int getLocation(char * fileName) {
 unsigned int Create(char* file_name){
 	printf("Create\n");
 
-}
-
-//////////////
-
-// ABE
-unsigned int Remove(char* file_name){
-
-}
-
-////////////// ALL EVAN
-
-unsigned int PrintSize(char* file_name){
-
-}
-
-unsigned int ChangeDirectory(char* dir_name){
-
-}
-
-unsigned int List(char* dir_name){
-	// Parse name
-	// Name to cluster
-	PrintDirectory(root_clus);
-}
-
-
-unsigned int MakeDir(char* dir_name){
-
-}
-
-unsigned int RemoveDir(char* dir_name){
-
-}
-
-//////////////
-
-// ABE
-unsigned int ReadFile(char* file_name, unsigned int pos, unsigned int size){
-
-}
-
-// ABE
-unsigned int WriteToFile(char* file_name, unsigned int pos, unsigned int size,
-	char* msg){
 }
